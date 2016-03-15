@@ -1,6 +1,7 @@
 from sympy import symbols, sin, cos, pi, Matrix, pprint, simplify, diff
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 # DH table of this planar robot given by
 # theta_i | d_i | alpha_i | a_i
@@ -63,22 +64,36 @@ J_inv = J.T * (J * J.T) ** -1
 q_dot = J_inv * v
 
 q_start = Matrix([[pi / 2, 0.8, -pi / 2]]).T
-dt = 4 * np.pi / 99
+dt = 4 * np.pi / 999
 
-position = np.array(p30.subs([(theta1, q_start[0]), (d2, q_start[1]), (theta3, q_start[2])]))
+#position = np.array(p30.subs([(theta1, q_start[0]), (d2, q_start[1]), (theta3, q_start[2])]))
 
-for time in np.linspace(0, 4 * np.pi, 100):
-    print('Time: %.2f' % time)
+times = np.linspace(0, 4 * np.pi, 1000)
+position = np.zeros((2, len(times)))
+position[:, 0] = np.array(p30.subs([(theta1, q_start[0]), (d2, q_start[1]), (theta3, q_start[2])]))[:,0]
+
+fig, ax = plt.subplots()
+line, = ax.plot(position[0, :], position[1, :])
+ax.set_xlim([0, 2])
+ax.set_ylim([0, 2])
+
+for i, time in enumerate(times):
+    print(i + 1, '/1000 points calculated    \r', end='', sep='')
     dq = q_dot.subs([(theta1, q_start[0]),
                      (d2, q_start[1]),
                      (theta3, q_start[2]),
                      (t, time)])
     q_start = q_start + dt * dq
-    position = np.hstack((position,
-        np.array(p30.subs([(theta1, q_start[0]),
-                           (d2, q_start[1]),
-                           (theta3, q_start[2])]))))
+    position[:, i] = np.array(p30.subs([(theta1, q_start[0]),
+                                        (d2, q_start[1]),
+                                        (theta3, q_start[2])]))[:, 0]
 
-plt.scatter(position[0, :], position[1, :])
+def animate(time):
+    global position
+    line.set_xdata(position[0, :time])
+    line.set_ydata(position[1, :time])
+    return line 
+
+ani = animation.FuncAnimation(fig, animate, range(position.shape[1]), interval=12.57)
 plt.title('Trajectory of end point')
 plt.show()
