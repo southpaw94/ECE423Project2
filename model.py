@@ -1,5 +1,6 @@
 from sympy import symbols, sin, cos, pi, Matrix, pprint, simplify, diff
 import numpy as np
+import matplotlib.pyplot as plt
 
 # DH table of this planar robot given by
 # theta_i | d_i | alpha_i | a_i
@@ -59,3 +60,25 @@ print('\nHence, the velocity vector is given by:')
 pprint(v)
 
 J_inv = J.T * (J * J.T) ** -1
+q_dot = J_inv * v
+
+q_start = Matrix([[pi / 2, 0.8, -pi / 2]]).T
+dt = 4 * np.pi / 99
+
+position = np.array(p30.subs([(theta1, q_start[0]), (d2, q_start[1]), (theta3, q_start[2])]))
+
+for time in np.linspace(0, 4 * np.pi, 100):
+    print('Time: %.2f' % time)
+    dq = q_dot.subs([(theta1, q_start[0]),
+                     (d2, q_start[1]),
+                     (theta3, q_start[2]),
+                     (t, time)])
+    q_start = q_start + dt * dq
+    position = np.hstack((position,
+        np.array(p30.subs([(theta1, q_start[0]),
+                           (d2, q_start[1]),
+                           (theta3, q_start[2])]))))
+
+plt.scatter(position[0, :], position[1, :])
+plt.title('Trajectory of end point')
+plt.show()
