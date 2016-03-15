@@ -1,4 +1,5 @@
 from sympy import symbols, sin, cos, pi, Matrix, pprint, simplify, diff
+from sympy.printing.theanocode import theano_function
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -77,12 +78,20 @@ line, = ax.plot(position[0, :], position[1, :])
 ax.set_xlim([0, 2])
 ax.set_ylim([0, 2])
 
+dq_out = q_dot.subs([(theta1, theta1), (d2, d2), (theta3, theta3), (t, t)])
+dq_calc = theano_function([theta1, d2, theta3, t], [dq_out], allow_input_downcast=True)
+
+parallel = True
+
 for i, time in enumerate(times):
     print(i + 1, '/1000 points calculated    \r', end='', sep='')
-    dq = q_dot.subs([(theta1, q_start[0]),
-                     (d2, q_start[1]),
-                     (theta3, q_start[2]),
-                     (t, time)])
+    if parallel == True:
+        dq = dq_calc(float(q_start[0]), float(q_start[1]), float(q_start[2]), time)
+    else:
+        dq = q_dot.subs([(theta1, q_start[0]),
+                         (d2, q_start[1]),
+                         (theta3, q_start[2]),
+                         (t, time)])
     q_start = q_start + dt * dq
     position[:, i] = np.array(p30.subs([(theta1, q_start[0]),
                                         (d2, q_start[1]),
@@ -90,10 +99,15 @@ for i, time in enumerate(times):
 
 def animate(time):
     global position
-    line.set_xdata(position[0, :time])
-    line.set_ydata(position[1, :time])
-    return line 
+    #line.set_xdata(position[0, :time])
+    #line.set_ydata(position[1, :time])
+    line.set_data(position[0, :time], position[1, :time])
+    return line,
 
-ani = animation.FuncAnimation(fig, animate, range(position.shape[1]), interval=12.57)
+def init():
+    line.set_data([], [])
+    return line,
+
+ani = animation.FuncAnimation(fig, animate, np.arange(position.shape[1]), interval=5, init_func=init, blit=True)
 plt.title('Trajectory of end point')
 plt.show()
