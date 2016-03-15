@@ -78,24 +78,21 @@ line, = ax.plot(position[0, :], position[1, :])
 ax.set_xlim([0, 2])
 ax.set_ylim([0, 2])
 
-dq_out = q_dot.subs([(theta1, theta1), (d2, d2), (theta3, theta3), (t, t)])
-dq_calc = theano_function([theta1, d2, theta3, t], [dq_out], allow_input_downcast=True)
+# Define expressions for computing the q_dot and p30 matrices
+dq = q_dot.subs([(theta1, theta1), (d2, d2), (theta3, theta3), (t, t)])
+p = p30.subs([(theta1, theta1), (d2, d2), (theta3, theta3)])
 
-parallel = True
+# Complile these expressions into C code for huge performance increase
+dq_calc = theano_function([theta1, d2, theta3, t], [dq], allow_input_downcast=True)
+p_calc = theano_function([theta1, d2, theta3], [p], allow_input_downcast=True)
 
 for i, time in enumerate(times):
     print(i + 1, '/1000 points calculated    \r', end='', sep='')
-    if parallel == True:
-        dq = dq_calc(float(q_start[0]), float(q_start[1]), float(q_start[2]), time)
-    else:
-        dq = q_dot.subs([(theta1, q_start[0]),
-                         (d2, q_start[1]),
-                         (theta3, q_start[2]),
-                         (t, time)])
+    dq = dq_calc(float(q_start[0]), float(q_start[1]), float(q_start[2]), time)
     q_start = q_start + dt * dq
-    position[:, i] = np.array(p30.subs([(theta1, q_start[0]),
-                                        (d2, q_start[1]),
-                                        (theta3, q_start[2])]))[:, 0]
+    position[:, i] = np.array(p_calc(float(q_start[0]),
+                                     float(q_start[1]),
+                                     float(q_start[2])))[:, 0]
 
 def animate(time):
     global position
@@ -108,6 +105,6 @@ def init():
     line.set_data([], [])
     return line,
 
-ani = animation.FuncAnimation(fig, animate, np.arange(position.shape[1]), interval=5, init_func=init, blit=True)
+ani = animation.FuncAnimation(fig, animate, np.arange(position.shape[1]), interval=5, init_func=init, blit=True, repeat=False)
 plt.title('Trajectory of end point')
 plt.show()
