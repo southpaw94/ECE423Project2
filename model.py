@@ -1,6 +1,8 @@
-from sympy import symbols, sin, cos, pi, Matrix, pprint, simplify, diff
+from sympy import symbols, sin, cos, pi, Matrix, pprint, simplify, diff, Identity
 from sympy.printing.theanocode import theano_function
 import numpy as np
+import os
+import pickle
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.patches as patches
@@ -59,9 +61,13 @@ p = Matrix([[0.6*cos(0.5*t)+1.2, 0.6*sin(0.5*t)+1.0]]).T
 v = diff(p, t)
 
 # compute the pseudo inverse of the symbolic jacobian matrix
-print('Computing the pseudo-inverse Jacobian, this may take some time...')
-J_inv = J.T * (J * J.T) ** -1
-q_dot = J_inv * v
+if os.path.isfile('jacobian_inverse.pkl') == True:
+    J_inv = pickle.load(open('jacobian_inverse.pkl', 'rb'))
+else:
+    print('Computing the pseudo-inverse Jacobian, this may take some time...')
+    J_inv = J.T * (J * J.T) ** -1
+
+q_dot = J_inv * v + (Identity(3).as_explicit() - J_inv * J) * (q - q.subs([(theta1, np.pi / 2), (d2, 0.9), (theta3, np.pi / 2)])) * -1
 
 q_start = Matrix([[pi / 2, 0.8, -pi / 2]]).T
 dt = 4 * np.pi / 999
@@ -91,6 +97,9 @@ ax.add_patch(link1)
 # add the second link
 link2 = plt.Polygon([[0, 0], [0, 0], [0, 0], [0, 0]], color='cyan')
 ax.add_patch(link2)
+
+joint2 = plt.Circle([0, 0], 0.015)
+ax.add_patch(joint2)
 
 # add the third joint (revolute)
 joint3 = plt.Circle([0, 0], 0.075, color='green')
@@ -143,6 +152,16 @@ def animate(time):
 
     t_start = ax.transData
 
+    # handle first link transform, initial position is locked, rotate about that position
+    coords = t_start.transform([0, 0])
+    t_change = mpl.transforms.Affine2D().rotate_around(coords[0], coords[1], q_vals[0, time] - np.pi / 2)
+    t_end = t_start + t_change
+    link1.set_xy([[-0.1, 0], [0.1, 0], [0.1, 0.9], [0.2, 0.9], [0.2, 1.1], [-0.2, 1.1], [-0.2, 0.9], [-0.1, 0.9]])
+    link1.set_transform(t_end)
+
+    # handle the movement of the second joint
+    joint2.center = [position3[0, time], position3[1, time]]
+
     # handle second link transform
     link2.set_xy([[position1[0, time] - 0.075, position1[1, time] + q_vals[1, time]],
                   [position1[0, time] + 0.075, position1[1, time] + q_vals[1, time]],
@@ -167,20 +186,13 @@ def animate(time):
     t_end = t_start + t_change
     link3.set_transform(t_end)
 
-    # handle first link transform, initial position is locked, rotate about that position
-    coords = t_start.transform([0, 0])
-    t_change = mpl.transforms.Affine2D().rotate_around(coords[0], coords[1], q_vals[0, time] - np.pi / 2)
-    t_end = t_start + t_change
-    link1.set_xy([[-0.1, 0], [0.1, 0], [0.1, 0.9], [0.2, 0.9], [0.2, 1.1], [-0.2, 1.1], [-0.2, 0.9], [-0.1, 0.9]])
-    link1.set_transform(t_end)
-
     # return the transformed links
-    return line, link2, link1, circ, link3, joint3
+    return line, link2, link1, circ, link3, joint3, joint2
 
 def init():
     line.set_data([], [])
     return line,
 
-ani = animation.FuncAnimation(fig, animate, np.arange(position3.shape[1]), interval=5, init_func=init, blit=True, repeat=False)
+ani = animation.FuncAnimation(fig, animate, np.arange(position3.shape[1]), interval=12, init_func=init, blit=True, repeat=False)
 plt.title('Trajectory of end point')
 plt.show()
