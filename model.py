@@ -76,10 +76,8 @@ position3[:, 0] = np.array(p30.subs([(theta1, q_start[0]), (d2, q_start[1]), (th
 
 fig, ax = plt.subplots()
 line, = ax.plot(position3[0, :], position3[1, :])
-arm = plt.Polygon([[0, 0], [0, 0], [0, 0]])
 floor = plt.Polygon([[-1.2, -0.2], [2, -0.2], [2, -1], [-1.2, -1]], color='lightblue')
 wall = plt.Polygon([[-1.2, -0.2], [-1.2, 2], [-1, 2], [-1, -0.2]], color='lightblue')
-ax.add_patch(arm)
 ax.add_patch(floor)
 ax.add_patch(wall)
 
@@ -90,8 +88,17 @@ link1 = plt.Polygon([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0,
 #link1._transform = tr
 ax.add_patch(link1)
 
-link2 = plt.Polygon([[0, 0], [0, 0], [0, 0], [0, 0]], color='lightblue')
+# add the second link
+link2 = plt.Polygon([[0, 0], [0, 0], [0, 0], [0, 0]], color='cyan')
 ax.add_patch(link2)
+
+# add the third joint (revolute)
+joint3 = plt.Circle([0, 0], 0.075, color='green')
+ax.add_patch(joint3)
+
+# add the final link
+link3 = plt.Polygon([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]], color='purple')
+ax.add_patch(link3)
 
 # add the base of the robot
 circ = plt.Circle([0, 0], 0.1, color='orange')
@@ -133,7 +140,6 @@ def animate(time):
 
     # Update the line
     line.set_data(position3[0, :time], position3[1, :time])
-    arm.set_xy([[0, 0.1], [0.1, 0], [position3[0, time], position3[1, time]]])
 
     t_start = ax.transData
 
@@ -147,6 +153,20 @@ def animate(time):
     t_end = t_start + t_change
     link2.set_transform(t_end)
 
+    # handle the third joint transform
+    joint3.center = [position2[0, time], position2[1, time]]
+
+    # handle the third link transform
+    link3.set_xy([[position2[0, time] - 0.075, position2[1, time]],
+                  [position2[0, time] - 0.075, position2[1, time] + 0.8],
+                  [position2[0, time], position2[1, time] + 1 - 0.075],
+                  [position2[0, time] + 0.075, position2[1, time] + 0.8],
+                  [position2[0, time] + 0.075, position2[1, time]]])
+    coords = t_start.transform([position2[0, time], position2[1, time]])
+    t_change = mpl.transforms.Affine2D().rotate_around(coords[0], coords[1], q_vals[0, time] + q_vals[2, time] - np.pi / 2)
+    t_end = t_start + t_change
+    link3.set_transform(t_end)
+
     # handle first link transform, initial position is locked, rotate about that position
     coords = t_start.transform([0, 0])
     t_change = mpl.transforms.Affine2D().rotate_around(coords[0], coords[1], q_vals[0, time] - np.pi / 2)
@@ -155,7 +175,7 @@ def animate(time):
     link1.set_transform(t_end)
 
     # return the transformed links
-    return line, arm, link2, link1, circ
+    return line, link2, link1, circ, link3, joint3
 
 def init():
     line.set_data([], [])
